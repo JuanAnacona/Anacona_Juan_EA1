@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autos Colombia - Control de Acceso</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        .form-group { margin-bottom: 15px; }
+        input, select, button { width: 100%; padding: 12px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        button:hover { background-color: #0056b3; }
+        .btn-salida { background-color: #dc3545; width: auto; padding: 8px 15px; margin-top: 0; }
+        .btn-salida:hover { background-color: #c82333; }
+        ul { list-style: none; padding: 0; }
+        li { background: #f9f9f9; margin-bottom: 10px; padding: 15px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Parqueadero "Autos Colombia"</h2>
+        
+        <div class="form-group">
+            <h3>Registrar Entrada</h3>
+            <input type="text" id="placa" placeholder="Placa del vehículo (ej. XYZ-123)" required>
+            <select id="tipo">
+                <option value="Automóvil">Automóvil</option>
+                <option value="Motocicleta">Motocicleta</option>
+                <option value="Camioneta">Camioneta</option>
+            </select>
+            <button onclick="registrarEntrada()">Registrar Entrada</button>
+        </div>
+
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
+
+        <div class="form-group">
+            <h3>Vehículos Actuales en Parqueadero</h3>
+            <div id="lista-vehiculos">Cargando...</div>
+        </div>
+    </div>
+
+    <script>
+        async function cargarVehiculos() {
+            const res = await fetch('/api/vehiculos');
+            const vehiculos = await res.json();
+            let html = vehiculos.length > 0 ? '<ul>' : '<p>No hay vehículos registrados en este momento.</p>';
+            vehiculos.forEach(v => {
+                html += `<li>
+                            <div>
+                                <strong>${v.placa}</strong> (${v.tipo})<br>
+                                <small style="color:#666;">Ingreso: ${v.entrada}</small>
+                            </div>
+                            <button class="btn-salida" onclick="registrarSalida('${v.placa}')">Dar Salida</button>
+                         </li>`;
+            });
+            if(vehiculos.length > 0) html += '</ul>';
+            document.getElementById('lista-vehiculos').innerHTML = html;
+        }
+
+        async function registrarEntrada() {
+            const placa = document.getElementById('placa').value;
+            const tipo = document.getElementById('tipo').value;
+            if(!placa) { alert('Por favor ingrese la placa del vehículo.'); return; }
+
+            const res = await fetch('/api/entrada', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ placa, tipo_vehiculo: tipo })
+            });
+            const data = await res.json();
+            alert(data.mensaje);
+            document.getElementById('placa').value = '';
+            cargarVehiculos();
+        }
+
+        async function registrarSalida(placa) {
+            if(!confirm(`¿Está seguro de registrar la salida del vehículo ${placa}?`)) return;
+            const res = await fetch('/api/salida', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ placa })
+            });
+            const data = await res.json();
+            alert(data.mensaje || data.error);
+            cargarVehiculos();
+        }
+
+        // Cargar los datos al iniciar la página
+        cargarVehiculos();
+    </script>
+</body>
+</html>
