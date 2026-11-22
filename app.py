@@ -18,6 +18,22 @@ def init_db():
             estado TEXT NOT NULL
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            documento TEXT NOT NULL,
+            placa TEXT NOT NULL,
+            celda_asignada TEXT
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS celdas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero TEXT NOT NULL,
+            estado TEXT NOT NULL
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -74,6 +90,34 @@ def obtener_vehiculos():
     registros = [{"id": r[0], "placa": r[1], "tipo": r[2], "entrada": r[3]} for r in c.fetchall()]
     conn.close()
     return jsonify(registros), 200
+
+@app.route('/api/usuarios', methods=['POST'])
+def registrar_usuario():
+    data = request.json
+    nombre = data.get('nombre')
+    documento = data.get('documento')
+    placa = data.get('placa').upper()
+    celda = data.get('celda_asignada')
+    
+    conn = sqlite3.connect('autos_colombia.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO usuarios (nombre, documento, placa, celda_asignada) VALUES (?, ?, ?, ?)",
+              (nombre, documento, placa, celda))
+    # Actualizar estado de la celda a Reservada
+    c.execute("UPDATE celdas SET estado = 'RESERVADA' WHERE numero = ?", (celda,))
+    conn.commit()
+    conn.close()
+    return jsonify({"mensaje": "Usuario registrado y celda asignada correctamente"}), 201
+
+# CASO DE USO: Consultar Mapa de Celdas
+@app.route('/api/celdas', methods=['GET'])
+def obtener_celdas():
+    conn = sqlite3.connect('autos_colombia.db')
+    c = conn.cursor()
+    c.execute("SELECT numero, estado FROM celdas")
+    celdas = [{"numero": r[0], "estado": r[1]} for r in c.fetchall()]
+    conn.close()
+    return jsonify(celdas), 200
 
 if __name__ == '__main__':
     init_db()
