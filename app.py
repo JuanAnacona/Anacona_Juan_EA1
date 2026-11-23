@@ -34,6 +34,15 @@ def init_db():
             estado TEXT NOT NULL
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS pagos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            placa TEXT NOT NULL,
+            monto REAL NOT NULL,
+            metodo_pago TEXT NOT NULL,
+            fecha_pago TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -118,6 +127,44 @@ def obtener_celdas():
     celdas = [{"numero": r[0], "estado": r[1]} for r in c.fetchall()]
     conn.close()
     return jsonify(celdas), 200
+
+@app.route('/api/pagos', methods=['POST'])
+def registrar_pago():
+    data = request.get_json()
+    placa = data.get('placa')
+    monto = data.get('monto')
+    metodo_pago = data.get('metodo_pago') # Efectivo, Tarjeta, Transferencia
+
+    if not placa or not monto or not metodo_pago:
+        return jsonify({'error': 'Faltan datos para procesar el pago'}), 400
+
+    conn = sqlite3.connect('autos_colombia.db')
+    c = conn.cursor()
+
+    try:
+        # 1. Registrar el pago en la base de datos
+        c.execute("INSERT INTO pagos (placa, monto, metodo_pago) VALUES (?, ?, ?)", 
+                  (placa, monto, metodo_pago))
+        
+        # 2. Liberar la celda si el cliente era de mensualidad (opcional según tu lógica)
+        # o actualizar el estado del vehículo a "Pagado/Inactivo"
+        c.execute("UPDATE celdas SET estado = 'LIBRE' WHERE numero = (SELECT celda_asignada FROM usuarios WHERE placa = ?)", (placa,))
+        
+        conn.commit()
+        return jsonify({
+            'mensaje': 'Pago registrado exitosamente',
+            'recibo': {
+                'placa': placa,
+                'total_pagado': monto,
+                'metodo': metodo_pago,
+                'fecha': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        }), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
     init_db()
